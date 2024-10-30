@@ -5,6 +5,7 @@ import numpy as np
 from pomegranate.distributions import Categorical
 from pomegranate.distributions import JointCategorical
 from pomegranate.factor_graph import FactorGraph
+from pomegranate.distributions import NeuralDistribution
 
 r1 = Categorical([[0.5, 0.5]])
 r2 = Categorical([[0.5, 0.5]])
@@ -20,6 +21,7 @@ def random_normalized_array(shape):
     return array / np.sum(array)
 
 f1 = JointCategorical(random_normalized_array((2,2,2,2,2,2)))
+f2 = NeuralDistribution()
 
 model = FactorGraph()
 

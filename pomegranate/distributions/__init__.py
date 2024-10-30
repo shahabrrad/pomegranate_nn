@@ -13,3 +13,4 @@ from .uniform import Uniform
 from .zero_inflated import ZeroInflated
 from .lognormal import LogNormal
 from .halfnormal import HalfNormal
+from .neuralnet import NeuralDistribution
