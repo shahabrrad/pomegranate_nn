@@ -13,6 +13,7 @@ from ._utils import _reshape_weights
 from .distributions._distribution import Distribution
 from .distributions._distribution import ConditionalDistribution
 
+from .distributions import NeuralDistribution
 from .distributions import Categorical
 from .distributions import JointCategorical
 
@@ -162,8 +163,8 @@ class FactorGraph(Distribution):
 			A distribution object to include as a node.
 		"""
 
-		if not isinstance(distribution, (Categorical, JointCategorical)):
-			raise ValueError("Must be a Categorical or a JointCategorical"
+		if not isinstance(distribution, (Categorical, JointCategorical, NeuralDistribution)):
+			raise ValueError("Must be a Categorical or a JointCategorical or NeuralDistribution"
 				" distribution.")
 
 		self.factors.append(distribution)

@@ -20,8 +20,14 @@ def random_normalized_array(shape):
     array = np.ones(shape)
     return array / np.sum(array)
 
-f1 = JointCategorical(random_normalized_array((2,2,2,2,2,2)))
-f2 = NeuralDistribution()
+
+num_categories_list = [2,2,2,2,2]
+embedding_dim_list = [2,2,2,2,2]  # Specify embedding dimensions for each variable
+hidden_dim = 64
+output_dim = 1
+
+# f1 = JointCategorical(random_normalized_array((2,2,2,2,2,2)))
+f1 = NeuralDistribution(num_categories_list, embedding_dim_list, hidden_dim, output_dim)
 
 model = FactorGraph()
 
@@ -42,8 +48,8 @@ model.add_edge(r5, f1)
 model.add_edge(r6, f1)
 
 data = np.random.randint(2, size=(1000,6))
-data = torch.tensor(data, dtype=torch.int32)
-print(data)
+# data = torch.tensor(data, dtype=torch.int32)
+# print(data)
 # print(data)
 model.fit(data)
 
