@@ -23,11 +23,13 @@ def random_normalized_array(shape):
 
 num_categories_list = [2,2,2,2,2]
 embedding_dim_list = [2,2,2,2,2]  # Specify embedding dimensions for each variable
+# num_categories_list = [2,2,2]
+# embedding_dim_list = [2,2,2]  
 hidden_dim = 64
 output_dim = 1
 
-# f1 = JointCategorical(random_normalized_array((2,2,2,2,2,2)))
-f1 = NeuralDistribution(num_categories_list, embedding_dim_list, hidden_dim, output_dim)
+f1 = JointCategorical(random_normalized_array((2,2,2,2,2,2))) #,2,2,2)))
+# f1 = NeuralDistribution(num_categories_list, embedding_dim_list, hidden_dim, output_dim)
 
 model = FactorGraph()
 
@@ -54,10 +56,12 @@ data = np.random.randint(2, size=(1000,6))
 model.fit(data)
 
 
-X_torch = torch.tensor([[0,1,0,1,0,1]])
-mask = torch.tensor([([False,]*1)+([True,]*5)])
+X_torch = torch.tensor([[0,1,0,1,0,1]]) #, [0,1,0,1,0,1], [0,1,0,1,0,1]])
+mask = torch.tensor([([False,]*1)+([True,]*5)]) #, ([False,]*1)+([True,]*5), ([False,]*1)+([True,]*5)])
+# X_torch = torch.tensor([[0,1,0]])
+# mask = torch.tensor([([False,]*1)+([True,]*2)])
 # print(mask)
 X_masked = torch.masked.MaskedTensor(X_torch, mask=mask)
 print("X_masked", X_masked)
 print("pred" , model.predict(X_masked))
-print("prob" , model.predict_proba(X_masked))
+# print("prob" , model.predict_proba(X_masked))

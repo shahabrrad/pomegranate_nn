@@ -338,14 +338,33 @@ class FactorGraph(Distribution):
 			prior_marginals.append(torch.clone(p))
 			current_marginals.append(torch.clone(p))
 
+		# this part of the code is copying the factors of the model based on the number of inputs that we have.
+		# since in NN there will be only one input, I am ignoring this (kinda)
 		for i, f in enumerate(self.factors):
-			if not isinstance(f, Categorical):
+			if isinstance(f, NeuralDistribution):
+				# print(X[:, self._factor_edges[i]])
+				mask = X._masked_mask[:, self._factor_edges[i]]
+				data = X._masked_data[:, self._factor_edges[i]]
+				non_masked_data = data[mask]
+				# print(f.model(torch.stack([non_masked_data])))
+				factors.append(f.model(torch.stack([non_masked_data])).item())
+				# print(factors)
+				# print(factors[-1])
+			elif not isinstance(f, Categorical):
 				p = torch.clone(f.probs)
+
+				p = p.repeat((X.shape[0],) + tuple(1 for _ in p.shape))
+
+				factors.append(p)
 			else:
 				p = torch.clone(f.probs[0])
+				# print((X.shape[0],) + tuple(1 for _ in p.shape))
+				# exit()
+				# print(p)
+				p = p.repeat((X.shape[0],) + tuple(1 for _ in p.shape))
+				factors.append(p)
 
-			p = p.repeat((X.shape[0],) + tuple(1 for _ in p.shape))
-			factors.append(p)
+		# print(factors[0][0].shape)
 
 		# Set the original in and out messages along the edges
 		in_messages, out_messages = [], []
@@ -357,37 +376,60 @@ class FactorGraph(Distribution):
 			for j in range(k):
 				in_messages[-1].append(m)
 
-		for i in range(len(factors)):
+		# length of factors is the same as length of self.factors
+		# so I am changing this (hopefully nothing goes wrong)
+		# for i in range(len(factors)):
+		for i in range(len(self.factors)):
 			k = len(self._factor_edges[i])
 			out_messages.append([])
 			
 			for j in range(k):
 				marginal_idx = self._factor_edges[i][j]
 				d_j = marginals[marginal_idx]
+				# print(d_j)
 				out_messages[-1].append(d_j)
 
-
+		# out_messages each entry is the messages sending out from a factor
+		# each out message is ordered by the variables connected to the factor
+		# out messages is ordered by the factors in the model
+		print("b" , out_messages)
+		print("b", in_messages)
 		# Begin iterations
 		iteration = 0
 		while iteration < self.max_iter:
 			# Update the messages going into the nodes.
+			#ok this is the important part
 			for i, f in enumerate(factors):
+				# here i is the index of the factor
+				# and f is the probability table of that factor
+			# for start, lets change i so it is based on len factors
+			# for i in range(len(self.factors)):
 				ni_edges = len(self._factor_edges[i])
 
 				for k in range(ni_edges):
+					# lets see what message does here :))
 					message = torch.clone(f)
 
 					shape = torch.ones(len(message.shape), dtype=torch.int32)
 					shape[0] = X.shape[0]
-
+					# print(shape, message, ni_edges)
+					# print(shape)
+					# exit()
 					for l in range(ni_edges):
 						if k == l:
 							continue
-
-						shape[l+1] = message.shape[l+1]						
-						message *= out_messages[i][l].reshape(*shape)
+						# I am trying to understand what is happening here
+						shape[l+1] = message.shape[l+1]
+						# print(shape)	
+						# print(1, out_messages[i][l], i, l)	
+						# print(2, out_messages[i][l].reshape(*shape))
+						# print(message)				
+						message *= out_messages[i][l].reshape(*shape)		# message is not actually message, it is the internalized calculation on the factor 
+						# print(message)
 						message = torch.sum(message, dim=l+1, keepdims=True)
 						shape[l+1] = 1
+						# print(message)
+						# exit()
 
 					else:
 						message = message.squeeze()
@@ -398,12 +440,14 @@ class FactorGraph(Distribution):
 					for ik, parent in enumerate(self._marginal_edges[j]):
 						if parent == i:
 							dims = tuple(range(1, len(message.shape)))
-							in_messages[j][ik] = message / message.sum(
+							in_messages[j][ik] = message / message.sum(		# ok i get what is happening here: normalizing
 								dim=dims, keepdims=True)
 
 							break
-
-
+				print("a", out_messages)
+				print("a", len(in_messages))
+				print(self._factor_edges)
+				print(self._marginal_edges)
 			# Calculate the current estimates of the marginals
 			loss = 0
 			for i, m in enumerate(marginals):
@@ -426,13 +470,15 @@ class FactorGraph(Distribution):
 			if loss < self.tol:
 				break
 
-
+			
+			# current asssesment: I don't need to change this part of the code. Just fix the calculation of in_messages
 			# Update the messages leaving based on the new marginals
 			for i, m in enumerate(marginals):
 				ni_edges = len(self._marginal_edges[i])
 
 				for k in range(ni_edges):
 					message = torch.clone(m)
+					print("me", message)
 
 					for l in range(ni_edges):
 						if k == l:
