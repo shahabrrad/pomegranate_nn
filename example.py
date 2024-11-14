@@ -29,11 +29,13 @@ hidden_dim = 64
 output_dim = 1
 
 f1 = JointCategorical(random_normalized_array((2,2,2,2,2,2))) #,2,2,2)))
+f2 = JointCategorical(random_normalized_array((2,2,2))) #,2,2,2)))
 # f1 = NeuralDistribution(num_categories_list, embedding_dim_list, hidden_dim, output_dim)
 
 model = FactorGraph()
 
 model.add_factor(f1)
+model.add_factor(f2)
 
 model.add_marginal(r1)
 model.add_marginal(r2)
@@ -48,6 +50,10 @@ model.add_edge(r3, f1)
 model.add_edge(r4, f1)
 model.add_edge(r5, f1)
 model.add_edge(r6, f1)
+
+model.add_edge(r5, f2)
+model.add_edge(r2, f2)
+model.add_edge(r1, f2)
 
 data = np.random.randint(2, size=(1000,6))
 # data = torch.tensor(data, dtype=torch.int32)

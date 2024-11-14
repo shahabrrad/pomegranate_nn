@@ -309,7 +309,7 @@ class FactorGraph(Distribution):
 			not matter what the underlying value in the tensor is for the 
 			missing values.
 		"""
-
+		print(X)
 		nm = len(self.marginals)
 		nf = len(self.factors)
 
@@ -394,6 +394,7 @@ class FactorGraph(Distribution):
 			for i in range(len(self.factors)):
 				f = self.factors[i]
 				if not isinstance(f, NeuralDistribution):
+					f = factors[i]
 					ni_edges = len(self._factor_edges[i])
 
 					for k in range(ni_edges):
@@ -407,12 +408,17 @@ class FactorGraph(Distribution):
 							if k == l:
 								continue
 							# I am trying to understand what is happening here
-							shape[l+1] = message.shape[l+1]				
+							shape[l+1] = message.shape[l+1]		
+							# print("out message", i, l, out_messages[i][l])	
+							# print("shapes", message.shape, out_messages[i][l].reshape(*shape).shape)	
 							message *= out_messages[i][l].reshape(*shape)		# message is not actually message, it is the internalized calculation on the factor 
 							message = torch.sum(message, dim=l+1, keepdims=True)
+							# print("message for edge ", l, " is ", message.shape)
+							# print("message on dim l ", message[0][0][0][0][0][0])
 							shape[l+1] = 1
 
 						else:
+							# print("going out for ", l, " because k is ", k)
 							message = message.squeeze()
 							if len(message.shape) == 1:
 								message = message.unsqueeze(0)
@@ -421,18 +427,35 @@ class FactorGraph(Distribution):
 						for ik, parent in enumerate(self._marginal_edges[j]):
 							if parent == i:
 								dims = tuple(range(1, len(message.shape)))
+								print("sum", message, message.sum(		# ok i get what is happening here: normalizing
+									dim=dims, keepdims=True))
+								print(message)
 								in_messages[j][ik] = message / message.sum(		# ok i get what is happening here: normalizing
 									dim=dims, keepdims=True)
 
 								break
+					# print(i , "in messages ", in_messages)
+					# print(i , "out messages ", out_messages)
+					# print("n edges", ni_edges)
 				else:
 					ni_edges = len(self._factor_edges[i])
 					# for every edge connected to the factor
 					for k in range(ni_edges):
 						for l in range(ni_edges):	# ineed to sum for all the other edges
+							# l is the edge for which the message A_l->f is multiplied into the sum-product product section
 							if k == l:
 								continue
+							if l == 0:
+								# get the nurals nets output normally, then calculate 1- that, have it as a normal two elements of an array
+								message = f.model(torch.stack([non_masked_data])).item()
+								message = torch.stack([1-message, message])
+								continue #TODO this will make stuff dificult .
+							else:
+
 							# TODO calculate the factor * the incoming message here
+							f.num_categories_list # do for on this to find the lth dimention, and all the categories for that dimention
+							f.model(torch.stack([non_masked_data])).item() # calculate the model for all the values possible for the lth dimention (these are factor funcitons for that dimention)
+							out_messages[i][l] # message going into factor i from edge l: this will be multiplied with what we get from prior line 
 						# sum the factor*message here
 					# I have to calculate in_messages and update them
 						j = self._factor_edges[i][k]
@@ -463,7 +486,7 @@ class FactorGraph(Distribution):
 
 			if loss < self.tol:
 				print("c", out_messages)
-				print("breaking")
+				print("breaking at ", iteration)
 				break
 
 			
