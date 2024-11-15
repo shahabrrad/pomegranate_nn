@@ -93,7 +93,8 @@ class NeuralDistribution(Distribution):
 
         self._initialized = False
 
-        self.num_categories_list = num_categories_list
+        self.num_categories_list = num_categories_list[1:]
+        self.categories = num_categories_list
         self.embedding_dim_list = embedding_dim_list
         self.hidden_dim = hidden_dim
         self.output_dim = output_dim
@@ -145,8 +146,25 @@ class NeuralDistribution(Distribution):
             self.hidden_dim,
             self.output_dim)
 
+    # def probability(self, X):
+    #     return torch.exp(self.log_probability(X))
+
     def probability(self, X):
-        return torch.exp(self.log_probability(X))
+        """returns the probability fo X happening.
+        X is the array of all variables connected to the factor, including the 0 index
+        """
+        # print(type(X))
+        model_input = torch.tensor([X[1:]])
+        expected_output = torch.tensor(X[0])
+        # print(model_input, expected_output)
+        output = self.model(model_input).item()
+        if expected_output == 1:
+            # print("here")
+            return output
+        else:
+            # print("bjbjb")
+            return 1 - output
+
 
     # TODO - this will probably be an inferense step on the model
     def log_probability(self, X):
