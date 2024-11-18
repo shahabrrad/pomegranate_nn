@@ -223,6 +223,13 @@ class FactorGraph(Distribution):
 		m_idx = self._marginal_idxs[marginal]
 		f_idx = self._factor_idxs[factor]
 
+		if isinstance(factor, NeuralDistribution):
+			margina_index_in_factor = len(self._factor_edges[f_idx])
+			number_of_categories = factor.categories[margina_index_in_factor]
+
+			if number_of_categories != marginal.n_keys:
+				raise ValueError("The number of categories in the factor and the marginal do not match.")
+
 		self._factor_edges[f_idx].append(m_idx)
 		self._marginal_edges[m_idx].append(f_idx)
 
@@ -313,7 +320,7 @@ class FactorGraph(Distribution):
 			not matter what the underlying value in the tensor is for the 
 			missing values.
 		"""
-		print(X)
+
 		nm = len(self.marginals)
 		nf = len(self.factors)
 
@@ -412,40 +419,26 @@ class FactorGraph(Distribution):
 							if k == l:
 								continue
 							# I am trying to understand what is happening here
-							shape[l+1] = message.shape[l+1]		
-							# print("out message", i, l, out_messages[i][l])	
-							# print("shapes", message.shape, out_messages[i][l].reshape(*shape).shape)	
+							shape[l+1] = message.shape[l+1]	
 							message *= out_messages[i][l].reshape(*shape)		# message is not actually message, it is the internalized calculation on the factor 
 							message = torch.sum(message, dim=l+1, keepdims=True)
-							# print("message for edge ", l, " is ", message.shape)
-							# print("message on dim l ", message[0][0][0][0][0][0])
 							shape[l+1] = 1
 
 						else:
-							# print("going out for ", l, " because k is ", k)
 							message = message.squeeze()
 							if len(message.shape) == 1:
 								message = message.unsqueeze(0)
 
 						j = self._factor_edges[i][k]
-						print("j", j, 'i', i, 'k', k)
 						for ik, parent in enumerate(self._marginal_edges[j]):
 							if parent == i:
 								dims = tuple(range(1, len(message.shape)))
-								# print("sum", message, message.sum(		# ok i get what is happening here: normalizing
-								# 	dim=dims, keepdims=True))
-								# print(message)
-								print("ik", ik, in_messages[j][ik])
 								in_messages[j][ik] = message / message.sum(		# ok i get what is happening here: normalizing
 									dim=dims, keepdims=True)
-								print(in_messages[j][ik])
 								break
-					print(i , "in messages ", in_messages)
-					# print(i , "out messages ", out_messages)
-					# print("n edges", ni_edges)
+	
 				else:
 					ni_edges = len(self._factor_edges[i])
-					print("out messages", out_messages)
 					# for every edge connected to the factor
 					for k in range(ni_edges):
 						 # Iterate over each possible value of the target variable
@@ -454,9 +447,7 @@ class FactorGraph(Distribution):
 							sum_over_values = 0
 							# Iterate over all combinations of values for other variables in the factor
 							other_vars = [var for var in range(ni_edges) if var != k]
-							# print(k, x_i_val, other_vars)
 							other_vals_combinations = np.array(np.meshgrid(*[list(range(f.categories[var])) for var in other_vars])).T.reshape(-1, len(other_vars))
-							# print(other_vals_combinations)
 							relevant_values = {
 								var: [val for val, prob in enumerate(out_messages[i][var][0]) if prob > 0]
 								for var in other_vars
@@ -465,16 +456,12 @@ class FactorGraph(Distribution):
 							# Generate only the combinations of non-zero incoming messages
 							relevant_combinations = product(*[relevant_values[var] for var in other_vars])
 							combs = [ i for i in relevant_combinations]
-							# print(combs)
-							# print([ i for i in relevant_combinations])
-
-
 
 							for other_vals in combs:
 								# Construct a full variable assignment for the factor
 								var_values = {k: x_i_val}
 								var_values.update({var: val for var, val in zip(other_vars, other_vals)})
-								print("varval", var_values)
+
 								# Evaluate the joint probability and add to the sum
 								joint_prob = f.probability([var_values[var] for var in range(ni_edges)])
 
@@ -482,34 +469,22 @@ class FactorGraph(Distribution):
 								product_of_messages = joint_prob
 								for var, val in var_values.items():
 									if var != k:
-										# print(i, var, var_values[var], val, out_messages[i][var])
-										# print(out_messages[0][0][0].shape)
 										product_of_messages *= out_messages[i][var][0][var_values[var]]
-									print("product", product_of_messages, var, k)
 								sum_over_values += product_of_messages
-								print("sum", sum_over_values)
+
 							# Store the sum in the message for the current value of the target variable
 							message[x_i_val] = sum_over_values
 						m2 = torch.tensor([[message[i] for i in message.keys()]])
-						# print(m2, i, k)
-						# print(in_messages[i])
-						# in_messages[i][0][k] = m2
-						# print(in_messages)
+
 						j = self._factor_edges[i][k]
-						print("j", j, 'i', i, 'k', k)
+
 						for ik, parent in enumerate(self._marginal_edges[j]):
 							if parent == i:
 								dims = tuple(range(1, len(m2.shape)))
-								# print("sum", message, message.sum(		# ok i get what is happening here: normalizing
-								# 	dim=dims, keepdims=True))
-								# print(message)
-								print("ik", ik, in_messages[j][ik])
-								in_messages[j][ik] = m2 / m2.sum(		# ok i get what is happening here: normalizing
-									dim=dims, keepdims=True)
-								print(in_messages[j][ik])
-								break
-					# exit()
 
+								in_messages[j][ik] = m2 / m2.sum(		# normalizing
+									dim=dims, keepdims=True)
+								break
 
 						# these are commented for later. If the approach above does not work, I will try this
 					# 	for l in range(ni_edges):	# ineed to sum for all the other edges
@@ -535,6 +510,7 @@ class FactorGraph(Distribution):
 					# 			# TODO set in_messages[j][ik] value here
 					# 			break
 
+
 			# current assessment is that i dont need to change this part of the code
 			# Calculate the current estimates of the marginals
 			loss = 0
@@ -542,6 +518,7 @@ class FactorGraph(Distribution):
 				current_marginals[i] = torch.clone(m)
 
 				for k in range(len(self._marginal_edges[i])):
+					# print(current_marginals[i], in_messages[i][k])
 					current_marginals[i] *= in_messages[i][k]
 
 
@@ -556,9 +533,10 @@ class FactorGraph(Distribution):
 				print(iteration, loss.item())
 
 			if loss < self.tol:
-				print("c", out_messages)
-				print("x", in_messages)
-				print("breaking at ", iteration)
+				# if self.verbose:
+				# 	print("c", out_messages)
+				# 	print("x", in_messages)
+				# 	print("breaking at ", iteration)
 				break
 
 			

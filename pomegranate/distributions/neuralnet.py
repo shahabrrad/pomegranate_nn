@@ -37,12 +37,12 @@ class CategoricalNN(nn.Module):
             for num_categories, embedding_dim in zip(num_categories_list, embedding_dim_list)
         ])
 
-        # Fully connected layers
+        # FC layers
         total_embedding_dim = sum(embedding_dim_list)
         self.fc1 = nn.Linear(total_embedding_dim, hidden_dim)
         self.fc2 = nn.Linear(hidden_dim, output_dim)
 
-        # Activation functions
+        # activation
         self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
 
@@ -51,14 +51,13 @@ class CategoricalNN(nn.Module):
         embedded = [self.embeddings[i](x[:, i])
                     for i in range(len(self.embeddings))]
 
-        # Concatenate all embedded representations
+        # concatenate embeddings
         x = torch.cat(embedded, dim=1)
 
-        # Pass through the fully connected layers
+        # FC layers
         x = self.relu(self.fc1(x))
         x = self.fc2(x)
 
-        # Apply softmax to output (for classification)
         output = self.sigmoid(x)
         return output
 
@@ -68,6 +67,8 @@ class NeuralDistribution(Distribution):
     """A base distribution object.
 
     This distribution is inherited by all the other distributions.
+    input num_categories_list incluedes the categaries of all variables. The first variable is the output of the neural network
+    This is saved into categories attribute of the class. meanwhile the num_categories_list attribute includes only the categories of the output variables
     """
 
     def __init__(
@@ -93,15 +94,19 @@ class NeuralDistribution(Distribution):
 
         self._initialized = False
 
+        if num_categories_list[0] != 2: # TODO can this be changed to multiple categories if we change the network to be use softmax instead of sigmoid
+            raise ValueError("The output variable should have two categories")
+
         self.num_categories_list = num_categories_list[1:]
         self.categories = num_categories_list
         self.embedding_dim_list = embedding_dim_list
         self.hidden_dim = hidden_dim
         self.output_dim = output_dim
+        
 
         self.model = CategoricalNN(
-            num_categories_list,
-            embedding_dim_list,
+            self.num_categories_list,
+            self.embedding_dim_list,
             hidden_dim,
             output_dim)
 
@@ -146,27 +151,23 @@ class NeuralDistribution(Distribution):
             self.hidden_dim,
             self.output_dim)
 
-    # def probability(self, X):
-    #     return torch.exp(self.log_probability(X))
 
     def probability(self, X):
         """returns the probability fo X happening.
         X is the array of all variables connected to the factor, including the 0 index
         """
-        # print(type(X))
+
         model_input = torch.tensor([X[1:]])
         expected_output = torch.tensor(X[0])
-        # print(model_input, expected_output)
+
         output = self.model(model_input).item()
         if expected_output == 1:
-            # print("here")
             return output
         else:
-            # print("bjbjb")
             return 1 - output
 
 
-    # TODO - this will probably be an inferense step on the model
+    # TODO - This funciton can be just the log of probability function. left unimplemented for now because it is not used
     def log_probability(self, X):
         raise NotImplementedError
 
@@ -184,11 +185,7 @@ class NeuralDistribution(Distribution):
         # _check_parameter(X, "X", ndim=2, shape=(-1, self.d),
         #                  check_parameter=self.check_data)
 
-        # sample_weight = _reshape_weights(X, _cast_as_tensor(sample_weight),
-                                        #  device=self.device)
-        # print(X)
         X_train = torch.stack([i[1:] for i in X[:-100]], dim=0)
-        # print(X_train)
         Y_train = torch.stack([i[0] for i in X[:-100]], dim=0)
 
         X_val = torch.stack([i[1:] for i in X[-100:]], dim=0)
@@ -199,33 +196,22 @@ class NeuralDistribution(Distribution):
         optimizer = torch.optim.Adam(self.model.parameters(), lr=0.1)
 
         for epoch in range(num_epochs):
-            # model.train()
-
             # Forward pass
             outputs = self.model(X_train)
             loss = criterion(outputs.squeeze(), Y_train.float())
 
-    # Backward pass and optimization
+            # Backward pass and optimization
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-    # Calculate validation loss
-    # model.eval()
-    # with torch.no_grad():
-    #     val_outputs = model(X_val)
-    #     val_loss = criterion(val_outputs.squeeze(), Y_val.float())
-    #     print(f'Validation Loss: {val_loss.item():.4f}')
 
             if (epoch + 1) % 10 == 0:
-                # print(outputs)
                 print(
                     f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}')
-        # model.eval()
                 with torch.no_grad():
                     val_outputs = self.model(X_val)
                     val_loss = criterion(val_outputs.squeeze(), Y_val.float())
-# Calculate accuracy
                     predicted = (val_outputs.squeeze() > 0.5).float()
                     accuracy = (predicted == Y_val.float()
                                 ).sum().item() / Y_val.size(0)
