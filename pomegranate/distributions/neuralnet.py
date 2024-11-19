@@ -94,8 +94,8 @@ class NeuralDistribution(Distribution):
 
         self._initialized = False
 
-        if num_categories_list[0] != 2: # TODO can this be changed to multiple categories if we change the network to be use softmax instead of sigmoid
-            raise ValueError("The output variable should have two categories")
+        if (num_categories_list[0] != 2) or (output_dim != 2): # TODO can this be changed to multiple categories if we change the network to be use softmax instead of sigmoid
+            raise ValueError("The output variable should have two categories both in output_dim and in number of categories")
 
         self.num_categories_list = num_categories_list[1:]
         self.categories = num_categories_list
